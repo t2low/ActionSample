@@ -1,0 +1,83 @@
+name: Build and Deploy on Comment
+
+on:
+  issue_comment:
+    types: [ created ]
+
+jobs:
+  check-comment:
+    runs-on: ubuntu-latest
+    if: github.event.issue.pull_request != '' && startsWith(github.event.comment.body, '/build')
+    outputs:
+      release_notes: ${{ steps.release-notes.outputs.notes }}
+      pr_number: ${{ github.event.issue.number }}
+      flavor: ${{ steps.release-notes.outputs.flavor }}
+      capitalized_flavor: ${{ steps.release-notes.outputs.flavor }}
+    steps:
+      - name: Check Flavor
+        id: check-flavor
+        run: |
+          if [[ "${{ github.event.comment.body }}" =~ ^/build\ Develop ]]; then
+            echo "flavor=develop" >> $GITHUB_OUTPUT
+            echo "capitalized_flavor=Develop" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.comment.body }}" =~ ^/build\ Staging ]]; then
+            echo "flavor=staging" >> $GITHUB_OUTPUT
+            echo "capitalized_flavor=Staging" >> $GITHUB_OUTPUT
+          else
+            echo "flavor=develop" >> $GITHUB_OUTPUT
+            echo "capitalized_flavor=Develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set current datetime as env variable
+        env:
+          TZ: 'Asia/Tokyo' # タイムゾーン指定
+        run: echo "CURRENT_DATETIME=$(date +'%Y%m%d_%H%M')" >> $GITHUB_ENV
+
+      - name: Set Release Notes
+        id: release-notes
+        run: |
+          echo "notes<<GITHUB_COMMENT_EOF" >> $GITHUB_OUTPUT
+          echo "ver.${{ env.CURRENT_DATETIME }}_${{ steps.check-flavor.outputs.flavor }}" >> $GITHUB_OUTPUT
+          echo "${{ github.event.issue.html_url }}" >> $GITHUB_OUTPUT
+          echo "${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          echo "\n${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
+          echo "GITHUB_COMMENT_EOF" >> $GITHUB_OUTPUT
+
+      - uses: actions/github-script@v7.0.1
+        if: failure()
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ github.event.issue.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Build failed :('
+            })
+
+  build-and-deploy:
+    needs: check-comment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.check-comment.outputs.capitalized_flavor }}
+    steps:
+      - name: Comment sample
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ needs.check-comment.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'flavor: ${{ needs.check-comment.outputs.capitalized_flavor }}\nappId: ${{secrets.APP_ID}}\ntext: ${{values.APP_TEXT}}'
+            })
+
+      - name: Comment PR on Failure
+        if: failure()
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ needs.check-comment.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Debug build failed. Please check the Actions logs for more details.'
+            })
