@@ -67,7 +67,7 @@ jobs:
               issue_number: ${{ needs.check-comment.outputs.pr_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'flavor: ${{ needs.check-comment.outputs.capitalized_flavor }}\nappId: ${{secrets.APP_ID}}\ntext: ${{values.APP_TEXT}}'
+              body: 'flavor: ${{ needs.check-comment.outputs.capitalized_flavor }}\nappId: ${{secrets.APP_ID}}\ntext: ${{vars.APP_TEXT}}'
             })
 
       - name: Comment PR on Failure
