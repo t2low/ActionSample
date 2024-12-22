@@ -11,8 +11,8 @@ jobs:
     outputs:
       release_notes: ${{ steps.release-notes.outputs.notes }}
       pr_number: ${{ github.event.issue.number }}
-      flavor: ${{ steps.release-notes.outputs.flavor }}
-      capitalized_flavor: ${{ steps.release-notes.outputs.flavor }}
+      flavor: ${{ steps.check-flavor.outputs.flavor }}
+      capitalized_flavor: ${{ steps.check-flavor.outputs.flavor }}
     steps:
       - name: Check Flavor
         id: check-flavor
